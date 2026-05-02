@@ -1,0 +1,17 @@
+# Arquivos de estado e cache do Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Arquivos de variáveis com dados sensíveis
+*.tfvars
+*.tfvars.json
+
+# Chaves privadas geradas dinamicamente
+*.pem
+*.key
+
+# Arquivos gerados pela automação (Ansible)
+iscsi_vars.yml

@@ -1,0 +1,94 @@
+---
+- name: Inicializar e Montar Múltiplos Discos iSCSI
+  hosts: all
+  become: yes
+  
+  # Lê as variáveis geradas automaticamente pelo Terraform
+  vars_files:
+    - ../terraform/iscsi_vars.yml
+    
+  vars:
+    # Definindo a lista de discos a serem montados
+    discos_oci:
+      - nome: "AdAlive-Apps"
+        ip: "{{ iscsi_ip }}"
+        port: "{{ iscsi_port }}"
+        iqn: "{{ iscsi_iqn }}"
+        device: "/dev/sdb"
+        mount: "/home/ubuntu/AdAlive-Apps"
+        owner: "ubuntu"
+        group: "ubuntu"
+        
+      - nome: "u01"
+        ip: "{{ iscsi_ip_u01 }}"
+        port: "{{ iscsi_port_u01 }}"
+        iqn: "{{ iscsi_iqn_u01 }}"
+        device: "/dev/sdc"
+        mount: "/u01"
+        owner: "ubuntu" 
+        group: "ubuntu"
+  
+  tasks:
+    - name: 0. Atualizar o cache do APT e fazer o Upgrade do SO
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+  tasks:
+    - name: 1. Garantir que o serviço iSCSI está instalado
+      apt:
+        name: open-iscsi
+        state: present
+
+    - name: 2. Descobrir os targets iSCSI
+      command: "iscsiadm -m discovery -t sendtargets -p {{ item.ip }}:{{ item.port }}"
+      loop: "{{ discos_oci }}"
+      register: iscsi_discovery
+      changed_when: false
+
+    - name: 3. Iniciar os discos (Fazer login nos targets iSCSI)
+      command: "iscsiadm -m node -T {{ item.iqn }} -p {{ item.ip }}:{{ item.port }} -l"
+      loop: "{{ discos_oci }}"
+      register: iscsi_login
+      failed_when: "'already logged in' not in iscsi_login.stderr and iscsi_login.rc != 0"
+      changed_when: "'successful' in iscsi_login.stdout"
+
+    - name: 4. Criar tabela de partição nos discos
+      parted:
+        device: "{{ item.device }}"
+        number: 1
+        state: present
+      loop: "{{ discos_oci }}"
+
+    - name: 5. Formatar as partições como ext4
+      filesystem:
+        fstype: ext4
+        dev: "{{ item.device }}1"
+      loop: "{{ discos_oci }}"
+
+    - name: 6. Criar os diretórios de montagem
+      file:
+        path: "{{ item.mount }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: '0755'
+      loop: "{{ discos_oci }}"
+
+    - name: 7. Montar os discos e adicionar ao fstab
+      mount:
+        path: "{{ item.mount }}"
+        src: "{{ item.device }}1"
+        fstype: ext4
+        opts: "_netdev,rw,nofail" 
+        state: mounted
+      loop: "{{ discos_oci }}"
+
+    - name: 8. Garantir permissões pós-montagem
+      file:
+        path: "{{ item.mount }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        recurse: yes
+      loop: "{{ discos_oci }}"
