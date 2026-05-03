@@ -1,60 +1,87 @@
-# Automação de Infraestrutura OCI (Terraform + Ansible)
+# ☁️ Automação de Infraestrutura OCI (Terraform Modular + Ansible)
 
-Este repositório contém a automação completa para o provisionamento de infraestrutura na Oracle Cloud Infrastructure (OCI) utilizando **Terraform** e a posterior configuração do sistema operacional (montagem de discos iSCSI) utilizando **Ansible**.
+Este repositório contém uma solução corporativa para provisionamento automatizado de infraestrutura na Oracle Cloud Infrastructure (OCI) e configuração de sistema operacional. 
 
-## 🎯 Objetivo da Automação
-Provisionar uma instância de computação na OCI (VM.Standard.E4.Flex), atachar múltiplos discos em bloco (Block Volumes) via iSCSI, aplicar políticas automáticas de backup e realizar a inicialização, formatação (ext4) e montagem desses discos diretamente no Linux, garantindo as permissões corretas para os usuários.
+O projeto adota uma arquitetura modular, garantindo escalabilidade, segurança e reaproveitamento de código, seguindo as melhores práticas de Engenharia de Plataforma (Platform Engineering) e DevOps.
 
-## 📂 Estrutura do Repositório
+## 🎯 Escopo do Projeto
 
-O projeto segue as melhores práticas de separação de responsabilidades (Infraestrutura como Código vs. Gerenciamento de Configuração):
+A esteira executa duas funções principais de forma totalmente automatizada e desacoplada:
+
+1. **Infraestrutura como Código (Terraform):** Provisiona instâncias computacionais (Compute) e volumes de bloco (Storage), aplicando políticas automáticas de backup e conectando-os via protocolo iSCSI.
+
+2. **Gerenciamento de Configuração (Ansible):** Conecta via SSH, atualiza o S.O., instala dependências, descobre os *targets* iSCSI, cria partições, formata (ext4) e monta os volumes de forma persistente (fstab) com governança de permissões.
+
+## 📂 Arquitetura de Diretórios
+
+O código Terraform foi refatorado em **Módulos**, separando a lógica de Computação e Armazenamento:
+
 ```text
 atlantic-devops-automation/
-├── .gitignore                 # Arquivos sensíveis e de estado ignorados pelo Git
-├── README.md                  # Documentação do projeto
-├── terraform/                 # Todo o código de provisionamento (IaC)
-│   ├── main.tf                # Recursos: Instância, Discos e Attachments
-│   ├── variables.tf           # Declaração das variáveis do Terraform
-│   ├── outputs.tf             # Outputs exibidos no terminal
-│   ├── provider.tf            # Configuração do Provider OCI
-│   ├── ansible_integration.tf # Geração dinâmica do arquivo de variáveis do Ansible
-│   └── templates/
-│       └── ansible_vars.tpl   # Molde (template) para integração Terraform -> Ansible
-└── ansible/                   # Todo o código de configuração do S.O.
-    └── mount_disk.yml         # Playbook para formatação e montagem dos discos iSCSI
-🚀 Como Executar
-Pré-requisitos
-•	Terraform (>= 1.0.0) instalado localmente.
-•	Ansible instalado localmente.
-•	Credenciais da OCI configuradas (Tenancy OCID, User OCID, Fingerprint e Private Key).
-Passo 1: Provisionar a Infraestrutura (Terraform)
-Abra o terminal na raiz do repositório e execute:
+├── .gitignore                 # Proteção de arquivos sensíveis (estado e chaves)
+├── README.md                  # Documentação principal
+├── terraform/                 # Root module (Ponto de entrada do provisionamento)
+│   ├── main.tf                # Chamada dos módulos (Compute e Storage)
+│   ├── variables.tf           # Definição das variáveis de ambiente
+│   ├── outputs.tf             # Saídas no console
+│   ├── provider.tf            # Configuração de conexão com a OCI
+│   ├── ansible_integration.tf # Geração dinâmica de variáveis (Handover para o Ansible)
+│   ├── templates/             
+│   │   └── ansible_vars.tpl   # Template gerador do iscsi_vars.yml
+│   └── modules/               # 📦 Módulos reutilizáveis
+│       ├── compute/           # Lógica da Instância e Rede
+│       └── storage/           # Lógica dos Discos em Bloco (Block Volumes)
+└── ansible/                   
+    └── mount_disk.yml         # Playbook de montagem idempotente
+🛠️ Pré-requisitos
+Para executar este projeto, você precisará ter instalado na sua máquina local ou esteira de CI/CD:
+
+Terraform (v1.0.0 ou superior)
+
+Ansible (v2.9 ou superior)
+
+Credenciais ativas da Oracle Cloud (Tenancy OCID, User OCID, Fingerprint e Chave Privada API).
+
+🚀 Como Executar (Passo a Passo)
+Passo 1: Subir a Infraestrutura (Terraform)
+Abra o terminal na raiz do repositório, acesse a pasta do Terraform e inicialize os módulos:
+
 Bash
-# 1. Entre no diretório do Terraform
+# 1. Acesse o diretório
 cd terraform/
 
-# 2. Inicialize o provider e os módulos
+# 2. Baixe os providers e inicialize os módulos locais
 terraform init
 
-# 3. Valide o código (Opcional, mas recomendado)
-terraform validate
-
-# 4. Aplique a infraestrutura
+# 3. Provisione os recursos (Aprovação automática)
 terraform apply -auto-approve
-Nota: Ao final do apply, o Terraform irá criar dinamicamente o arquivo iscsi_vars.yml e a chave SSH privada .pem dentro da pasta terraform/.
-Passo 2: Configurar os Discos (Ansible)
-Volte para a raiz do repositório e execute o playbook do Ansible, utilizando o IP privado da instância gerado no output do passo anterior:
+💡 Nota: Após a execução, o Terraform gerará um IP Privado, baixará a chave SSH (.pem) na pasta do Terraform e criará dinamicamente o arquivo de integração com o Ansible.
+
+Passo 2: Configurar o S.O. e Discos (Ansible)
+Volte para a raiz do repositório e chame o playbook do Ansible, utilizando os dados gerados no Passo 1:
+
 Bash
 # 1. Volte para a raiz do projeto
 cd ..
 
-# 2. Execute o Playbook (Substitua <IP_DA_INSTANCIA> pelo IP gerado no Terraform)
-ansible-playbook -i "<IP_DA_INSTANCIA>," -u ubuntu --private-key terraform/adalive-tst.pem ansible/mount_disk.yml
-O que o Ansible fará automaticamente:
-1.	Atualizará o S.O. (apt update e upgrade).
-2.	Instalará o serviço open-iscsi.
-3.	Fará o discovery e o login nos targets iSCSI de todos os discos mapeados.
-4.	Criará as tabelas de partição e formatará em ext4.
-5.	Criará os diretórios de montagem (/home/ubuntu/AdAlive-Apps e /u01).
-6.	Inserirá as regras no /etc/fstab com a diretiva _netdev (garantindo reboots seguros).
-7.	Ajustará o owner/group das pastas montadas para o usuário ubuntu.
+# 2. Execute o playbook de montagem
+# Substitua <IP_GERADO> e <NOME_DA_CHAVE>.pem pelos valores criados pelo Terraform
+ansible-playbook -i "<IP_GERADO>," -u ubuntu --private-key terraform/<NOME_DA_CHAVE>.pem ansible/mount_disk.yml
+📈 Escalabilidade: Como adicionar mais discos?
+Graças à arquitetura modular, adicionar novos discos à instância é extremamente simples. Não é necessário reescrever lógicas de iSCSI ou scripts no S.O.
+
+No Terraform (terraform/main.tf): Adicione uma nova chamada ao módulo de storage:
+
+Terraform
+module "novo_disco" {
+  source              = "./modules/storage"
+  availability_domain = local.ad
+  compartment_id      = var.compartment_id
+  display_name        = "nome-do-seu-novo-disco"
+  size_in_gbs         = 50
+  instance_id         = module.servidor.instance_id
+  backup_policy_id    = data.oci_core_volume_backup_policies.backup_policy.volume_backup_policies[0].id
+}
+Integração (terraform/ansible_integration.tf): Adicione as variáveis do disco exportadas pelo módulo.
+
+No Ansible (ansible/mount_disk.yml): Adicione um novo item na lista de variáveis discos_oci. O Ansible fará o loop e montará o novo disco automaticamente na próxima execução.
