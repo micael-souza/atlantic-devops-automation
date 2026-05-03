@@ -1,0 +1,47 @@
+name: "Terraform CI - Validacao de Modulos"
+
+# Define quando o robô vai trabalhar
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  terraform-lint-and-validate:
+    name: "Inspecao de Codigo Terraform"
+    runs-on: ubuntu-latest
+    
+    # Diz ao GitHub Actions que todos os comandos Terraform devem rodar dentro da pasta terraform/
+    defaults:
+      run:
+        working-directory: ./terraform
+
+    steps:
+      # Passo 1: Baixa o seu código do repositório para a máquina do robô
+      - name: 📥 Checkout do Codigo
+        uses: actions/checkout@v4
+
+      # Passo 2: Instala o Terraform na máquina do robô
+      - name: 🛠️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0" # Pode ajustar para a versão que você usa
+
+      # Passo 3: Verifica se o código está formatado no padrão (sem espaços bizarros)
+      - name: 🧹 Terraform Format
+        id: fmt
+        run: terraform fmt -check
+        continue-on-error: true # Se falhar, avisa, mas não quebra tudo ainda
+
+      # Passo 4: Inicializa os módulos sem precisar conectar na nuvem
+      - name: ⚙️ Terraform Init
+        id: init
+        run: terraform init -backend=false
+
+      # Passo 5: O grande teste! Verifica se a sintaxe e as variáveis dos módulos estão corretas
+      - name: 🛡️ Terraform Validate
+        id: validate
+        run: terraform validate -no-color
