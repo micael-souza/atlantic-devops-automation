@@ -1,50 +1,67 @@
-name: "Terraform CI - Validacao de Modulos"
+name: "Terraform GitOps (Controle Manual)"
 
-# Define quando o robô vai trabalhar
 on:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
+  # Isso cria o botão no GitHub Actions!
+  workflow_dispatch:
+    inputs:
+      tf_action:
+        description: 'Qual ação você deseja executar?'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Credenciais do Provider OCI (Para ler/escrever recursos)
+  TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
+  TF_VAR_user_ocid: ${{ secrets.OCI_USER_OCID }}
+  TF_VAR_fingerprint: ${{ secrets.OCI_FINGERPRINT }}
+  TF_VAR_private_key: ${{ secrets.OCI_PRIVATE_KEY }}
+  TF_VAR_region: ${{ secrets.OCI_REGION }}
+  # Credenciais do Backend S3 (Para ler/escrever o .tfstate)
+  AWS_ACCESS_KEY_ID: ${{ secrets.OCI_S3_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.OCI_S3_SECRET_KEY }}
 
 jobs:
-  terraform-lint-and-validate:
-    name: "Inspecao de Codigo Terraform"
+  terraform:
+    name: "Execução do Terraform"
     runs-on: ubuntu-latest
     
-    # Diz ao GitHub Actions que todos os comandos Terraform devem rodar dentro da pasta terraform/
     defaults:
       run:
         working-directory: ./terraform
 
     steps:
-      # Passo 1: Baixa o seu código do repositório para a máquina do robô
       - name: 📥 Checkout do Codigo
         uses: actions/checkout@v4
 
-      # Passo 2: Instala o Terraform na máquina do robô
       - name: 🛠️ Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.5.0" # Pode ajustar para a versão que você usa
+          terraform_version: "1.5.0"
 
-      # Passo 3: Verifica se o código está formatado no padrão (sem espaços bizarros)
-      - name: 🧹 Terraform Format
-        id: fmt
-        run: terraform fmt -check
-        continue-on-error: true # Se falhar, avisa, mas não quebra tudo ainda
-
-      # Passo 4: Inicializa os módulos sem precisar conectar na nuvem
       - name: ⚙️ Terraform Init
         id: init
-        run: terraform init -backend=false
+        run: terraform init
 
-      # Passo 5: O grande teste! Verifica se a sintaxe e as variáveis dos módulos estão corretas
-      - name: 🛡️ Terraform Validate
-        id: validate
-        run: terraform validate -no-color
+      - name: 📋 Terraform Plan
+        # Roda se for Pull Request OU se escolher 'plan' no botão manual
+        if: github.event_name == 'pull_request' || github.event.inputs.tf_action == 'plan'
+        run: terraform plan -no-color
+
+      - name: 🚀 Terraform Apply
+        # Roda APENAS se escolher 'apply' no botão manual
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.tf_action == 'apply'
+        run: terraform apply -auto-approve -no-color
+
+      - name: 💣 Terraform Destroy
+        # Roda APENAS se escolher 'destroy' no botão manual
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.tf_action == 'destroy'
+        run: terraform destroy -auto-approve -no-color
