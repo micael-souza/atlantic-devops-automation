@@ -1,3 +1,22 @@
+terraform {
+  backend "s3" {
+    bucket = "ob-tf-state-terraform"
+    key    = "tst-col-101/terraform.tfstate"
+    region = "sa-saopaulo-1" # Ajuste se sua região for diferente
+
+    # Endpoint da OCI (Substitua <NAMESPACE> pelo Namespace da sua Tenancy)
+    endpoints = {
+      s3 = "https://grqmasfgwzsp.compat.objectstorage.sa-saopaulo-1.oraclecloud.com"
+    }
+
+    use_path_style              = true
+    skip_region_validation      = true
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_requesting_account_id  = true
+  }
+}
+
 # --- DATA SOURCES ---
 # Busca a política de backup existente
 data "oci_core_volume_backup_policies" "backup_policy" {
