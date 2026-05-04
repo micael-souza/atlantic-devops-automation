@@ -1,93 +1,103 @@
-Aqui está o código Markdown atualizado para o seu README.md. Ele agora reflete a estrutura modular avançada e destaca a nova esteira de Integração Contínua (CI) com o GitHub Actions que você acabou de implementar.
+# 🚀 Automação de Infraestrutura GitOps: Terraform, Ansible e OCI
 
-Você pode copiar o bloco abaixo e substituir todo o conteúdo atual do seu arquivo README.md:
+Este repositório contém a arquitetura e o código-fonte da esteira de CI/CD (Continuous Integration / Continuous Deployment) para Infraestrutura como Código (IaC) da **Atlantic Solutions**. 
 
-Markdown
-# ☁️ Automação de Infraestrutura OCI (Terraform Modular + Ansible + CI/CD)
+O objetivo desta solução é provisionar, configurar e gerenciar recursos na Oracle Cloud Infrastructure (OCI) de forma totalmente automatizada, segura e escalável, utilizando o modelo GitOps.
 
-Este repositório contém uma solução corporativa de ponta a ponta para o provisionamento automatizado de infraestrutura na Oracle Cloud Infrastructure (OCI) e configuração de sistema operacional. 
+---
 
-O projeto adota uma arquitetura modular, garantindo escalabilidade, segurança e reaproveitamento de código, seguindo as melhores práticas de Engenharia de Plataforma (Platform Engineering), DevOps e Integração Contínua.
+## 🛠️ 1. Ferramentas e Serviços Utilizados
 
-## 🎯 Escopo do Projeto
+*   **[Terraform](https://www.terraform.io/) (v1.14.7):** Ferramenta principal de orquestração de IaC. Traduz o código declarativo em chamadas de API para construir a infraestrutura física/virtual (servidores, redes, discos).
+*   **[Ansible](https://www.ansible.com/):** Ferramenta de Gerenciamento de Configuração. Atua no pós-provisionamento para configurar os recursos operacionais (ex: formatação e montagem de discos).
+*   **[Oracle Cloud Infrastructure (OCI)](https://www.oracle.com/cloud/):** Provedor de nuvem de destino.
+    *   *Compute:* Provisionamento dos servidores (Instâncias).
+    *   *Block Storage:* Gerenciamento de discos e volumes.
+    *   *Object Storage (S3 Compatible):* Cofre seguro utilizado para armazenar o arquivo de estado (`.tfstate`).
+*   **[GitHub Actions](https://github.com/features/actions):** Plataforma de CI/CD que atua como nosso "robô operador", executando os comandos em ambientes efêmeros.
 
-A esteira executa três funções principais de forma totalmente automatizada e desacoplada:
-1. **Integração Contínua (GitHub Actions):** Valida a formatação e a sintaxe do código Terraform automaticamente a cada *Push* ou *Pull Request*, garantindo a qualidade do código antes do deploy.
-2. **Infraestrutura como Código (Terraform):** Provisiona instâncias computacionais (Compute) e volumes de bloco (Storage), aplicando políticas automáticas de backup e conectando-os via protocolo iSCSI.
-3. **Gerenciamento de Configuração (Ansible):** Conecta via SSH, atualiza o S.O., instala dependências, descobre os *targets* iSCSI, cria partições, formata (ext4) e monta os volumes de forma persistente (fstab) com governança de permissões.
+---
 
-## 📂 Arquitetura de Diretórios
+## 🏛️ 2. Os Três Pilares da Solução
 
-O código foi refatorado em **Módulos** e conta com uma esteira de automação:
+### 🛡️ Segurança: Gestão Efêmera de Chaves Sensíveis
+Nenhuma credencial, OCID privado ou arquivo de acesso à nuvem é exposto no código-fonte. 
+Todas as informações sigilosas estão no cofre criptografado (**GitHub Secrets**). O GitHub Actions captura o texto da chave privada da API da OCI e cria um arquivo `.pem` dinamicamente dentro do *runner*. Ao fim do job, a máquina virtual é destruída e a chave desaparece (vazamento zero).
+
+### ⚙️ Automação: Pipeline CI/CD Unificada
+Eliminamos a necessidade de execução local. O workflow inicializa, valida e aplica as mudanças automaticamente via GitHub Actions. O pipeline possui um painel interativo (`workflow_dispatch`), permitindo selecionar a ação (`plan`, `apply`, `destroy`) em um menu suspenso. O Terraform também aciona o Ansible automaticamente via `local-exec` pós-deploy.
+
+### 🧱 Confiabilidade: Estado Remoto Seguro (Workaround S3)
+O estado (`.tfstate`) é centralizado na nuvem utilizando o Object Storage da OCI configurado com a API do Amazon S3. Para contornar a incompatibilidade de *chunked encoding* da AWS (Erro 501 da OCI), injetamos as variáveis `AWS_REQUEST_CHECKSUM_CALCULATION` e `AWS_RESPONSE_CHECKSUM_VALIDATION` no GitHub Actions, garantindo um upload limpo.
+
+---
+
+## 📂 3. Estrutura de Diretórios e Arquivos
+
+O projeto utiliza o padrão de **Módulos do Terraform** para separar responsabilidades lógicas.
 ```text
-atlantic-devops-automation/
-├── .github/
-│   └── workflows/
-│       └── terraform-ci.yml   # 🤖 Pipeline de CI (GitHub Actions)
-├── .gitignore                 # Proteção de arquivos sensíveis (estado e chaves)
-├── README.md                  # Documentação principal
-├── terraform/                 # ☁️ Root module (Ponto de entrada do provisionamento)
-│   ├── main.tf                # Chamada dos módulos (Compute e Storage)
-│   ├── variables.tf           # Definição das variáveis de ambiente
-│   ├── outputs.tf             # Saídas no console
-│   ├── provider.tf            # Configuração de conexão com a OCI
-│   ├── ansible_integration.tf # Geração dinâmica de variáveis (Handover para o Ansible)
-│   ├── templates/             
-│   │   └── ansible_vars.tpl   # Template gerador do iscsi_vars.yml
-│   └── modules/               # 📦 Módulos reutilizáveis
-│       ├── compute/           # Lógica da Instância e Rede
-│       └── storage/           # Lógica dos Discos em Bloco (Block Volumes)
-└── ansible/                   
-    └── mount_disk.yml         # 🐧 Playbook de montagem idempotente
-🛠️ Pré-requisitos
-Para executar este projeto, você precisará ter instalado na sua máquina local:
+📦 atlantic-devops-automation
+├── 📂 .github/workflows/
+│   └── 📄 terraform-ci.yml        # Cérebro da automação (Pipeline principal)
+├── 📂 ansible/
+│   └── 📄 mount_disk.yml          # Playbook de pós-provisionamento de discos
+├── 📂 terraform/
+│   ├── 📂 modules/
+│   │   ├── 📂 compute/            # Módulo de criação de Instâncias (VMs)
+│   │   └── 📂 storage/            # Módulo de criação de Block Volumes
+│   ├── 📂 templates/
+│   │   └── 📄 ansible_vars.tpl    # Template para injetar IPs e vars no Ansible
+│   ├── 📄 main.tf                 # Orquestrador, define o backend (S3) e chama módulos
+│   ├── 📄 provider.tf             # Configuração de autenticação com a OCI
+│   ├── 📄 variables.tf            # Declaração de variáveis globais
+│   ├── 📄 outputs.tf              # Exibição de resultados no terminal
+│   └── 📄 ansible_integration.tf  # Ponte Terraform -> Ansible (Inventário e execução)
+├── 📄 .gitignore                  # Proteção de arquivos sensíveis e de cache
+└── 📄 README.md                   # Esta documentação
+🚀 4. Passo a Passo da Implementação Realizada
+Para replicar ou entender como o ambiente foi inicialmente construído:
 
-Terraform (v1.0.0 ou superior)
+Preparação na OCI:
 
-Ansible (v2.9 ou superior)
+Criação de Usuário de Serviço (Service Account).
 
-Credenciais ativas da Oracle Cloud (Tenancy OCID, User OCID, Fingerprint e Chave Privada API).
+Geração de credenciais de API (.pem/Fingerprint) e Customer Secret Keys (S3).
 
-🚀 Como Executar (Passo a Passo)
-Passo 1: Subir a Infraestrutura (Terraform)
-Abra o terminal na raiz do repositório, acesse a pasta do Terraform e inicialize os módulos:
+Criação do bucket privado e aplicação de políticas IAM de menor privilégio.
 
-Bash
-# 1. Acesse o diretório
-cd terraform/
+Configuração de Secrets no GitHub:
 
-# 2. Baixe os providers e inicialize os módulos locais
-terraform init
+Cadastro de variáveis sensíveis da OCI (TENANCY_OCID, USER_OCID, PRIVATE_KEY, REGION).
 
-# 3. Provisione os recursos (Aprovação automática)
-terraform apply -auto-approve
-💡 Nota: Após a execução, o Terraform gerará um IP Privado, baixará a chave SSH (.pem) na pasta do Terraform e criará dinamicamente o arquivo de integração com o Ansible (iscsi_vars.yml).
+Cadastro das variáveis da infra (COMPARTMENT_OCID, SUBNET_ID, IMAGE_ID).
 
-Passo 2: Configurar o S.O. e Discos (Ansible)
-Volte para a raiz do repositório e chame o playbook do Ansible, utilizando os dados gerados no Passo 1:
+Cadastro das credenciais S3 (S3_ACCESS_KEY, S3_SECRET_KEY).
 
-Bash
-# 1. Volte para a raiz do projeto
-cd ..
+Configuração do Backend e Workaround S3 (main.tf):
 
-# 2. Execute o playbook de montagem
-# Substitua <IP_GERADO> e <NOME_DA_CHAVE>.pem pelos valores gerados pelo Terraform
-ansible-playbook -i "<IP_GERADO>," -u ubuntu --private-key terraform/<NOME_DA_CHAVE>.pem ansible/mount_disk.yml
-📈 Escalabilidade: Como adicionar mais discos?
-Graças à arquitetura modular, adicionar novos discos à instância é extremamente simples. Não é necessário reescrever lógicas de iSCSI ou scripts no S.O.
+Configuração do bloco com skip_requesting_account_id = true e skip_s3_checksum = true para compatibilidade com o Storage da Oracle.
 
-No Terraform (terraform/main.tf): Adicione uma nova chamada ao módulo de storage:
+Integração do Ansible (ansible_integration.tf):
 
-Terraform
-module "novo_disco" {
-  source              = "./modules/storage"
-  availability_domain = local.ad
-  compartment_id      = var.compartment_id
-  display_name        = "nome-do-seu-novo-disco"
-  size_in_gbs         = 50
-  instance_id         = module.servidor.instance_id
-  backup_policy_id    = data.oci_core_volume_backup_policies.backup_policy.volume_backup_policies[0].id
-}
-Integração (terraform/ansible_integration.tf): Adicione as variáveis do disco exportadas pelo módulo.
+Uso do local_file para gerar o inventário dinâmico a partir do template (ansible_vars.tpl).
 
-No Ansible (ansible/mount_disk.yml): Adicione um novo item na lista de variáveis discos_oci. O Ansible fará o loop e montará o novo disco automaticamente na próxima execução.
+Disparo via null_resource com local-exec via SSH após o provisionamento.
+
+Construção da Pipeline (terraform-ci.yml):
+
+Gatilho manual configurado com workflow_dispatch.
+
+Injeção segura de chaves efêmeras via shell (chmod 600).
+
+Versão do Terraform cravada na pipeline para evitar quebra de sintaxe.
+
+🔄 5. Fluxo de Execução (Ciclo de Vida)
+Gatilho: O engenheiro aciona o workflow no GitHub Actions escolhendo a ação.
+
+Setup: O runner monta o ambiente, injeta as chaves efêmeras do cofre e inicializa os módulos (init).
+
+Provisionamento: O Terraform orquestra a criação na OCI (Computação e depois Storage).
+
+Configuração Pós-Deploy: O IP da nova máquina é lido e o Ansible é acionado silenciosamente para montar os discos.
+
+Gravação de Estado: O processo é finalizado salvando a "fotografia" do ambiente remotamente no cofre seguro.
