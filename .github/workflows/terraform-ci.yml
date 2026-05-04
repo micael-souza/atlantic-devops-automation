@@ -36,6 +36,10 @@ env:
   TF_VAR_subnet_id: ${{ secrets.OCI_SUBNET_ID }}
   TF_VAR_image_id: ${{ secrets.OCI_IMAGE_ID }}
 
+  # Desliga o chunked encoding forçado do novo SDK da AWS:
+  AWS_REQUEST_CHECKSUM_CALCULATION: "WHEN_REQUIRED"
+  AWS_RESPONSE_CHECKSUM_VALIDATION: "WHEN_REQUIRED"
+
 jobs:
   terraform:
     name: "Execução do Terraform"
