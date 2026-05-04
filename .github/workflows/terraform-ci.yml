@@ -25,7 +25,7 @@ env:
   TF_VAR_region: ${{ secrets.OCI_REGION }}
   
   # Nota sobre a chave: No pipeline usamos o conteúdo (private_key) e não o caminho (private_key_path)
-  TF_VAR_private_key: ${{ secrets.OCI_PRIVATE_KEY }} 
+  TF_VAR_private_key_path: "private_key.pem"
 
   # --- Credenciais do Backend S3 ---
   AWS_ACCESS_KEY_ID: ${{ secrets.OCI_S3_ACCESS_KEY }}
@@ -49,6 +49,12 @@ jobs:
       - name: 📥 Checkout do Codigo
         uses: actions/checkout@v4
 
+      - name: 📝 Criar arquivo da Private Key
+        run: |
+          echo "$OCI_KEY" > private_key.pem
+          chmod 600 private_key.pem
+        env:
+          OCI_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
       - name: 🛠️ Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
