@@ -19,3 +19,8 @@ variable "image_id" {
 variable "instance_name" {
   default = "tst-col-101"
 }
+
+variable "ssh_public_key" {
+  description = "Chave SSH pública injetada pelo GitHub Actions"
+  type        = string
+}

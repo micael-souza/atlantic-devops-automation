@@ -27,20 +27,6 @@ data "oci_core_volume_backup_policies" "backup_policy" {
     values = ["life-cycle-backup"]
   }
 }
-
-# Gera a chave SSH
-resource "tls_private_key" "ssh_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-# Salva a chave localmente
-resource "local_file" "private_key_pem" {
-  content         = tls_private_key.ssh_key.private_key_pem
-  filename        = "${path.module}/${var.instance_name}.pem"
-  file_permission = "0600"
-}
-
 # ==========================================
 # 1. CRIANDO O SERVIDOR (Chamando o Módulo)
 # ==========================================
@@ -55,7 +41,7 @@ module "servidor" {
   shape               = local.instance_shape
   ocpus               = local.ocpus
   memory_in_gbs       = local.memory_in_gbs
-  ssh_public_key      = tls_private_key.ssh_key.public_key_openssh
+  ssh_public_key      = var.ssh_public_key
 }
 
 # Aplica política de backup no disco de boot usando o output do módulo
