@@ -23,7 +23,6 @@ env:
   TF_VAR_user_ocid: ${{ secrets.OCI_USER_OCID }}
   TF_VAR_fingerprint: ${{ secrets.OCI_FINGERPRINT }}
   TF_VAR_region: ${{ secrets.OCI_REGION }}
-  TF_VAR_private_key_path: "private_key.pem"
     
   # Nota sobre a chave: No pipeline usamos o conteúdo (private_key) e não o caminho (private_key_path)
   TF_VAR_private_key_path: "private_key.pem"
