@@ -8,6 +8,7 @@ crash.*.log
 # Arquivos de variáveis com dados sensíveis
 *.tfvars
 *.tfvars.json
+!terraform.tfvars
 
 # Chaves privadas geradas dinamicamente
 *.pem

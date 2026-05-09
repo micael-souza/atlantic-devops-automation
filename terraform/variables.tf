@@ -5,19 +5,19 @@ variable "private_key_path" {}
 variable "region" { default = "sa-saopaulo-1" }
 
 variable "compartment_id" {
-  description = "ocid1.compartment.oc1..aaaaaaaavtrdfnushzhy66eyxmgoxjh2bosnybao7rdba24ddoag5yoe7n2a"
+  description = "compartimento oci movix360"
 }
 
 variable "subnet_id" {
-  description = "ocid1.subnet.oc1.sa-saopaulo-1.aaaaaaaax4msykot2gdaspju25soiwjufnvhtoqr5nzt66vkusdhk4aquyca"
+  description = "subnet privada movix360"
 }
 
 variable "image_id" {
-  description = "ocid1.image.oc1.sa-saopaulo-1.aaaaaaaacimohwuizo5fsdmp64ururv3glp2o2b6p5326kej55ju3jygotjq"
+  description = "imagem ubuntu 22.04 adalive v2"
 }
 
 variable "instance_name" {
-  default = "tst-col-101"
+  default = "prd-maestria-101"
 }
 
 variable "ssh_public_key" {

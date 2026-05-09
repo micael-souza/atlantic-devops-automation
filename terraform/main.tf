@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
     bucket = "ob-tf-state-terraform"
-    key    = "tst-col-101/terraform.tfstate"
+    key    = "prd-maestria-101/terraform.tfstate"
     region = "sa-saopaulo-1" # Ajuste se sua região for diferente
 
     # Endpoint da OCI (Substitua <NAMESPACE> pelo Namespace da sua Tenancy)
@@ -60,10 +60,11 @@ module "disco_adalive_apps" {
 
   availability_domain = local.ad
   compartment_id      = var.compartment_id
-  display_name        = "tst-col-101-adalive-apps"
-  size_in_gbs         = 100
-  instance_id         = module.servidor.instance_id # Pega o ID gerado pelo módulo acima!
-  backup_policy_id    = data.oci_core_volume_backup_policies.backup_policy.volume_backup_policies[0].id
+  # Deixando o nome dinâmico baseado no nome do servidor!
+  display_name     = "${var.instance_name}-adalive-apps"
+  size_in_gbs      = 100
+  instance_id      = module.servidor.instance_id # Pega o ID gerado pelo módulo acima!
+  backup_policy_id = data.oci_core_volume_backup_policies.backup_policy.volume_backup_policies[0].id
 }
 
 # Disco 2: U01
@@ -72,7 +73,7 @@ module "disco_u01" {
 
   availability_domain = local.ad
   compartment_id      = var.compartment_id
-  display_name        = "tst-col-101-u01"
+  display_name        = "${var.instance_name}-u01"
   size_in_gbs         = 100
   instance_id         = module.servidor.instance_id
   backup_policy_id    = data.oci_core_volume_backup_policies.backup_policy.volume_backup_policies[0].id
