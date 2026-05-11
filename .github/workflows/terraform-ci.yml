@@ -75,6 +75,15 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.tf_action == 'apply'
         run: terraform apply -auto-approve -no-color
 
+      - name: 📦 Disponibilizar Chave SSH para Download
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.tf_action == 'apply'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chave-ssh-time-infra
+          # Pega APENAS a chave do servidor, ignorando a chave da API da Oracle!
+          path: terraform/*-time-infra.pem
+          retention-days: 1
+
       - name: 💣 Terraform Destroy
         # Roda APENAS se escolher 'destroy' no botão manual
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.tf_action == 'destroy'
