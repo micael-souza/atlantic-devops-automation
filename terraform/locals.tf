@@ -5,5 +5,5 @@ locals {
   # Definição do Shape
   instance_shape = "VM.Standard.E4.Flex"
   ocpus          = 1
-  memory_in_gbs  = 4
+  memory_in_gbs  = 8
 }
